@@ -21,33 +21,29 @@ local nickNameMaxCharLength = 15
 
 
 --[[
-
 In server.lua add [ chatEss = require("rpChatEssentials") ] to the top
-
 In server.lua search for "return false -- commands should be hidden" and highlight the "else" all the way to the "return true"
 replace it with
-
 		elseif cmd[1] == "me" then
 			chatEss.SendActionMsg(pid, message)
 		elseif cmd[1] == "nick" then
 			chatEss.SetNickName(pid, message)
 		elseif cmd[1] == "/" then
+			message = string.sub(message, 3)
 			chatEss.SendGlobalMessage(pid, message)
 		elseif cmd[1] == "//" then
+			message = string.sub(message, 4)
 			chatEss.SendLocalOOCMessage(pid, message)
         else
             local message = "Not a valid command. Type /help for more info.\n"
             tes3mp.SendMessage(pid, color.Error..message..color.Default, false)
         end
-
         return false -- commands should be hidden
     end
 	
 	chatEss.SendLocalMessage(pid, message, true)
 	
     return false -- hide default chat and replace it with chat essentials.
-
-
 --]]
 
 
@@ -99,7 +95,6 @@ end
 
 Methods.SendLocalOOCMessage = function(pid, message)
 	if enableLocalChat == true then
-		message = string.sub(message, 4)
 		local msg = localOOCChatHeaderColor..localOOCChatHeader..color.Default..Players[pid].name.." ("..pid.."):"..message
 		Methods.SendLocalMessage(pid, msg, false)
 	else
@@ -117,7 +112,6 @@ end
 
 Methods.SendGlobalMessage = function(pid, message)
 	if message:len() > 3 then
-		message = string.sub(message, 3)
 		tes3mp.SendMessage(pid, globalChatHeaderColor..globalChatHeader..color.Default..Players[pid].name.." ("..pid.."):"..message.."\n", true)
 	else
 		tes3mp.SendMessage(pid, "Your message cannot be empty.\n", false)
