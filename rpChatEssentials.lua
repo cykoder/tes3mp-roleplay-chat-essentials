@@ -19,33 +19,284 @@ local nickNameColor = color.Cyan
 local nickNameMinCharLength = 3
 local nickNameMaxCharLength = 15
 
+local styles = {}
+local playerStyles = {}
 
---[[
-In server.lua add [ chatEss = require("rpChatEssentials") ] to the top
-In server.lua search for "return false -- commands should be hidden" and highlight the "else" all the way to the "return true"
-replace it with
-		elseif cmd[1] == "me" then
-			chatEss.SendActionMsg(pid, message)
-		elseif cmd[1] == "nick" then
-			chatEss.SetNickName(pid, message)
-		elseif cmd[1] == "/" then
-			message = string.sub(message, 3)
-			chatEss.SendGlobalMessage(pid, message)
-		elseif cmd[1] == "//" then
-			message = string.sub(message, 4)
-			chatEss.SendLocalOOCMessage(pid, message)
-        else
-            local message = "Not a valid command. Type /help for more info.\n"
-            tes3mp.SendMessage(pid, color.Error..message..color.Default, false)
-        end
-        return false -- commands should be hidden
+Methods.Init = function()
+	
+	local home = os.getenv("MOD_DIR").."/style/"
+    local file = io.open(home .. "prefix.json", "r")
+	if file ~= nil then
+		io.close()
+		styles = jsonInterface.load("style/prefix.json")
+	else
+		styles.admin = color.Red.."[Admin]"..color.Default
+		styles.moderator = color.BlueViolet.."[Mod]"..color.Default
+		
+		jsonInterface.save("style/prefix.json", styles)
+	end
+
+end
+
+function loadPlayerStyle(pid)
+	-- Replace characters not allowed in filenames
+    local acc = string.upper(Players[pid].name)
+    acc = string.gsub(acc, patterns.invalidFileCharacters, "_")
+    acc = acc .. ".json"
+	
+	local style = {}
+	style.nameColor = color.Default
+	style.prefix = {}
+	
+	local home = os.getenv("MOD_DIR").."/style/players/"
+    local file = io.open(home .. acc, "r")
+	if file ~= nil then
+		io.close()
+		style = jsonInterface.load("style/players/"..acc)
+	else
+		style.nameColor = color.Default
+		style.prefix = {}
+		jsonInterface.save("style/players/"..acc, style)
+	end
+	
+	return style
+end
+
+
+
+function savePlayerStyle(pid)
+	-- Replace characters not allowed in filenames
+    local acc = string.upper(Players[pid].name)
+    acc = string.gsub(acc, patterns.invalidFileCharacters, "_")
+    acc = acc .. ".json"
+	
+	jsonInterface.save("style/players/"..acc, playerStyles[pid])
+end
+
+
+
+Methods.OnPlayerSendMessage = function(pid, message)
+	if enableLocalChat == true then
+		Methods.SendLocalMessage(pid, message, true)
+	else
+		Methods.SendGlobalMessage(pid, message, true)
+	end
+	return HIDE_DEFAULT_CHAT
+end
+
+
+
+Methods.OnPlayerSendCommand = function(pid, cmd, message)
+
+	local admin = false
+    local moderator = false
+    if Players[pid]:IsAdmin() then
+        admin = true
+        moderator = true
+    elseif Players[pid]:IsModerator() then
+        moderator = true
     end
-	
-	chatEss.SendLocalMessage(pid, message, true)
-	
-    return false -- hide default chat and replace it with chat essentials.
---]]
 
+	
+	if cmd[1] == "me" then
+	
+		Methods.SendActionMsg(pid, message)
+		
+		return COMMAND_EXECUTED
+		
+	elseif cmd[1] == "nick" then
+	
+		Methods.SetNickName(pid, message)
+		
+		return COMMAND_EXECUTED
+		
+	elseif cmd[1] == "/" then
+	
+		message = string.sub(message, 3)
+		Methods.SendGlobalOOCMessage(pid, message)
+		
+		return COMMAND_EXECUTED
+		
+	elseif cmd[1] == "//" then
+	
+		message = string.sub(message, 4)
+		Methods.SendLocalOOCMessage(pid, message)
+		
+		return COMMAND_EXECUTED
+	
+	elseif cmd[1] == "ncolor" and moderator then
+		
+		if cmd[2] ~= nil and cmd[3] ~= nil then
+			if myMod.CheckPlayerValidity(pid, cmd[2]) then
+				tes3mp.SendMessage(pid, Methods.SetNameColor(tonumber(cmd[2]), "#"..cmd[3]), false)
+			end
+		else
+			tes3mp.SendMessage(pid, "Invalid arguments expected /ncolor PID ColorCode\n", false)
+		end
+		
+		return COMMAND_EXECUTED
+	
+	elseif cmd[1] == "prefix" and moderator then
+		
+		if cmd[2] ~= nil and cmd[3] ~= nil and cmd[4] ~= nil then
+			if cmd[2] == "add" then
+				if styles[cmd[3]] ~= nil and myMod.CheckPlayerValidity(pid, tonumber(cmd[4])) then
+					tes3mp.SendMessage(pid, Methods.AddPrefix(tonumber(cmd[4]), cmd[3]), false)
+				end
+			elseif cmd[2] == "remove" then
+				if styles[cmd[3]] ~= nil and myMod.CheckPlayerValidity(pid, tonumber(cmd[4])) then
+					tes3mp.SendMessage(pid, Methods.RemovePrefix(tonumber(cmd[4]), cmd[3]), false)
+				end
+			else
+				tes3mp.SendMessage(pid, "Expected add/remove in argument #2.\n", false)
+			end
+		else
+			tes3mp.SendMessage(pid, "Use /prefix add/remove description PID\n", false)
+		end
+		
+		return COMMAND_EXECUTED
+		
+	end
+	return DO_NOTHING
+end
+
+
+
+Methods.OnPlayerConnect = function(pid)
+	playerStyles[pid] = loadPlayerStyle(pid)
+end
+
+
+
+Methods.OnPlayerDisconnect = function(pid)
+	playerStyles[pid] = nil
+	nickNames[pid] = nil
+end
+
+
+
+---------------------------------------------------------
+--				Start of RP functions				   --
+---------------------------------------------------------
+
+Methods.GetFullName = function(pid, enforceRealName)
+	local playerName = Players[pid].name
+	
+	if enforceRealName == true then
+		return playerName
+	else
+	
+		local prefix = ""
+		for i,tag in pairs(playerStyles[pid].prefix) do
+			if styles[tag] ~= nil then
+				prefix = prefix..styles[tag].." "
+			end
+		end
+	
+		if nickNames[pid] ~= nil and enableNickNames == true then
+			return prefix..nickNameColor..nickNames[pid]..color.Default
+		else
+			return prefix..playerStyles[pid].nameColor..playerName..color.Default
+		end
+	end
+end
+
+Methods.SetNickName = function(pid, name)
+	if enableNickNames == true then
+		if name ~= nil then
+			name = string.sub(name, 7)
+			if name:len() >= nickNameMinCharLength and name:len() <= nickNameMaxCharLength then
+				nickNames[pid] = name
+				tes3mp.SendMessage(pid, "Your nickname has been set to: "..name.."\n", false)
+			else
+				nickNames[pid] = nil
+				tes3mp.SendMessage(pid, "Your nickname has been reset.\n(Nicknames must be "..nickNameMinCharLength.."-"..nickNameMaxCharLength.." characters long)\n", false)
+			end
+		end
+	else
+		tes3mp.SendMessage(pid, "Nicknames are not enabled on this server.\n", false)
+	end
+end
+
+Methods.AddPrefix = function(pid, description)
+
+	if styles[description] ~= nil then
+		for i,d in pairs(playerStyles[pid].prefix) do
+			if d == description then
+				return "That player already has the prefix \""..description.."\".\n"
+			end
+		end
+		
+		table.insert(playerStyles[pid].prefix, description)
+		
+		savePlayerStyle(pid)
+		
+		return "Prefix \""..description.."\" added to "..Methods.GetFullName(pid, true)..".\n"
+		
+	else
+		return "The prefix \""..description.."\" does not exist.\n"
+	end
+
+end
+
+Methods.RemovePrefix = function(pid, description)
+
+	if styles[description] ~= nil then
+	
+		local index = 0
+		
+		for i,d in pairs(playerStyles[pid].prefix) do
+			if d == description then
+				index = i
+			end
+		end
+		
+		if index > 0 then
+			table.remove(playerStyles[pid].prefix, index)
+		end
+		
+		savePlayerStyle(pid)
+		
+		return "Removed prefix \""..description.."\" from player "..Methods.GetFullName(pid, true)..".\n"
+		
+	else
+		return "The prefix \""..description.."\" does not exist.\n"
+	end
+
+end
+
+Methods.SetNameColor = function(pid, color)
+	if string.len(color) == 7 then
+		if string.byte(string.sub(color, 1, 1)) == 35 then
+			for i=2,7,1 do
+				local b = string.byte(string.sub(color, i, i))
+				if (b < 48 or b > 57) and (b < 65 or b > 70) then
+					return "Incorrect color code format 0-9 / A-F (ie: FFFFFF).\n"
+				end
+			end
+			
+			if playerStyles[pid] ~= nil then
+				playerStyles[pid].nameColor = color
+				savePlayerStyle(pid)
+				return "Player "..Methods.GetFullName(pid, true).."'s name color has been set.\n"
+			else
+				return "Player "..pid.." does not exist."
+			end
+		end
+		return "Incorrect color code format 0-9 / A-F (ie: FFFFFF)."
+	else
+		return "Color codes have to be 7 characters long (ie: FFFFFF)."
+	end
+
+end
+
+Methods.SendGlobalMessage = function(pid, message, useName)
+	if useName == true then
+		tes3mp.SendMessage(pid, Methods.GetFullName(pid, false)..": "..message.."\n", true)
+	else
+		tes3mp.SendMessage(pid, message.."\n", true)
+	end
+end
 
 Methods.SendLocalMessage = function(pid, message, useName)
 	local playerName = Players[pid].name
@@ -69,11 +320,7 @@ Methods.SendLocalMessage = function(pid, message, useName)
 				-- send message to each player in cell
 				if LoadedCells[tempCell] ~= nil then
 					if useName == true then
-						if nickNames[playerName] ~= nil and enableNickNames == true then
-							SendMessageToAllInCell(tempCell, nickNameColor..nickNames[playerName]..color.Default..": "..message.."\n")
-						else
-							SendMessageToAllInCell(tempCell, playerName..": "..message.."\n")
-						end
+							SendMessageToAllInCell(tempCell, Methods.GetFullName(pid, false)..": "..message.."\n")
 					else
 						SendMessageToAllInCell(tempCell, message.."\n")
 					end
@@ -82,23 +329,10 @@ Methods.SendLocalMessage = function(pid, message, useName)
 		end
 	else
 		if useName == true then
-			if nickNames[playerName] ~= nil and enableNickNames == true then
-				SendMessageToAllInCell(myCellDescription, nickNameColor..nickNames[playerName]..color.Default..": "..message.."\n")
-			else
-				SendMessageToAllInCell(myCellDescription, playerName..": "..message.."\n")
-			end
+			SendMessageToAllInCell(myCellDescription, Methods.GetFullName(pid, false)..": "..message.."\n")
 		else
 			SendMessageToAllInCell(myCellDescription, message.."\n")
 		end
-	end
-end
-
-Methods.SendLocalOOCMessage = function(pid, message)
-	if enableLocalChat == true then
-		local msg = localOOCChatHeaderColor..localOOCChatHeader..color.Default..Players[pid].name.." ("..pid.."):"..message
-		Methods.SendLocalMessage(pid, msg, false)
-	else
-		tes3mp.SendMessage(pid, "You cannot send a local OOC with local chat disabled.\n")
 	end
 end
 
@@ -110,29 +344,27 @@ function SendMessageToAllInCell(cellDescription, message)
 	end
 end
 
-Methods.SendGlobalMessage = function(pid, message)
-	if message:len() > 3 then
-		tes3mp.SendMessage(pid, globalChatHeaderColor..globalChatHeader..color.Default..Players[pid].name.." ("..pid.."):"..message.."\n", true)
+Methods.SendLocalOOCMessage = function(pid, message)
+	if enableLocalChat == true then
+		local msg = localOOCChatHeaderColor..localOOCChatHeader..color.Default..Methods.GetFullName(pid, true).." ("..pid.."):"..message
+		Methods.SendLocalMessage(pid, msg, false)
+	else
+		tes3mp.SendMessage(pid, "You cannot send a local OOC with local chat disabled.\n")
+	end
+end
+
+Methods.SendGlobalOOCMessage = function(pid, message)
+	if message:len() > 1 then
+		local msg = globalChatHeaderColor..globalChatHeader..color.Default..Methods.GetFullName(pid, true).." ("..pid.."):"..message
+		Methods.SendGlobalMessage(pid, msg, false)
 	else
 		tes3mp.SendMessage(pid, "Your message cannot be empty.\n", false)
 	end
 end
 
-Methods.OnPlayerSendMessage = function(pid, message)
-	if enableLocalChat == true then
-		Methods.SendLocalMessage(pid, message, true)
-	else
-		if nickNames[playerName] ~= nil and enableNickNames == true then
-			tes3mp.SendMessage(pid, nickNameColor..nickNames[playerName]..color.Default..": "..message.."\n", true)
-		else
-			tes3mp.SendMessage(pid, playerName..": "..message.."\n", true)
-		end
-	end
-end
-
 Methods.SendActionMsg = function(pid, message)
 	local msg
-	if message:len() > 4 then
+	if message:len() > 1 then
 		if nickNames[Players[pid].name] ~= nil and enableNickNames == true then
 			msg = actionMsgColor..actionMsgSymbol..nickNames[Players[pid].name]..string.sub(message, 4)..actionMsgSymbol..color.Default
 		else
@@ -142,27 +374,10 @@ Methods.SendActionMsg = function(pid, message)
 		if enableLocalChat == true then
 			Methods.SendLocalMessage(pid, msg, false)
 		else 
-			tes3mp.SendMessage(pid, msg.."\n", true)
+			Methods.SendGlobalMessage(pid, msg, false)
 		end
 	else
 		tes3mp.SendMessage(pid, "Your message cannot be empty.\n", false)
-	end
-end
-
-Methods.SetNickName = function(pid, name)
-	if enableNickNames == true then
-		if name ~= nil then
-			name = string.sub(name, 7)
-			if name:len() >= nickNameMinCharLength and name:len() <= nickNameMaxCharLength then
-				nickNames[Players[pid].name] = name
-				tes3mp.SendMessage(pid, "Your nickname has been set to: "..name.."\n", false)
-			else
-				nickNames[Players[pid].name] = nil
-				tes3mp.SendMessage(pid, "Your nickname has been reset.\n(Nicknames must be "..nickNameMinCharLength.."-"..nickNameMaxCharLength.." characters long)\n", false)
-			end
-		end
-	else
-		tes3mp.SendMessage(pid, "Nicknames are not enabled on this server.\n", false)
 	end
 end
 
