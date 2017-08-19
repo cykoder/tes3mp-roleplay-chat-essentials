@@ -1,43 +1,36 @@
 # Install Guide
 
-**1.)** In **server.lua** add ```chatEss = require("rpChatEssentials")``` *near the top* **and** *under* ```myMod = require("myMod")```
+**1.)** This script requires **msgScriptEssentials** install from https://github.com/David-AW/tes3mp-chat-script-essentials
 
 
-**2.)** CTRL+F and find ```return false -- commands should be hidden``` then replace:
+**2.)** Go into **/mp-stuff/data/** and open **scripts.json**
 
+
+**3.)** Put ```"rpChatEssentials":[true,true,true]``` as the *first* script at the top
+
+**Example:**
 ```
-        else
-            local message = "Not a valid command. Type /help for more info.\n"
-            tes3mp.SendMessage(pid, color.Error..message..color.Default, false)
-        end
-
-        return false -- commands should be hidden
-    end
-
-    return true -- default behavior, chat messages should not
+{
+  "rpChatEssentials":[true,true,true]
+  "foo":[true,false,false]
+  "bar":[false,true,false]
+  "zulu":[true,true,false]
+}
 ```
 
-**with:**
 
-```
-		elseif cmd[1] == "me" then
-			chatEss.SendActionMsg(pid, message)
-		elseif cmd[1] == "nick" then
-			chatEss.SetNickName(pid, message)
-		elseif cmd[1] == "/" then
-			message = string.sub(message, 3)
-			chatEss.SendGlobalMessage(pid, message)
-		elseif cmd[1] == "//" then
-			message = string.sub(message, 4)
-			chatEss.SendLocalOOCMessage(pid, message)
-        else
-            local message = "Not a valid command. Type /help for more info.\n"
-            tes3mp.SendMessage(pid, color.Error..message..color.Default, false)
-        end
-        return false -- commands should be hidden
-    end
-	
-	chatEss.SendLocalMessage(pid, message, true)
-	
-  return false -- hide default chat and replace it with chat essentials.
-```
+**4.)** While in **/mp-stuff/data/**, create a folder named **style**
+
+
+**5.)** Inside the newly created folder "**/mp-stuff/data/style/**", create a folder named **players**
+
+
+**6.)** Drop **rpChatEssentials.lua** into **/mp-stuff/scripts/**
+
+
+**7.)** While in **/mp-stuff/scripts/** open **server.lua**
+
+
+**8.)** CTRL+F and find **OnPlayerConnect** and put ```msgScript.GetScript("rpChatEssentials").OnPlayerConnect(pid)``` *underneath* ```myMod.OnPlayerConnect(pid, playerName)```
+
+**9.)** CTRL+F and find **OnPlayerDisconnect** and put ```msgScript.GetScript("rpChatEssentials").OnPlayerDisconnect(pid)``` *underneath* ```myMod.OnPlayerDisconnect(pid)```
