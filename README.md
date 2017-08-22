@@ -31,6 +31,6 @@
 **7.)** While in **/mp-stuff/scripts/** open **server.lua**
 
 
-**8.)** CTRL+F and find **OnPlayerConnect** and put ```msgScript.GetScript("rpChatEssentials").OnPlayerConnect(pid)``` *underneath* ```myMod.OnPlayerConnect(pid, playerName)```
+**8.)** CTRL+F and find **OnPlayerConnect** and put ```msgScript.GetScript("rpChatEssentials").OnPlayerConnect(pid)``` *underneath* ```myMod.OnPlayerConnect```
 
-**9.)** CTRL+F and find **OnPlayerDisconnect** and put ```msgScript.GetScript("rpChatEssentials").OnPlayerDisconnect(pid)``` *underneath* ```myMod.OnPlayerDisconnect(pid)```
+**9.)** CTRL+F and find **OnPlayerDisconnect** and put ```msgScript.GetScript("rpChatEssentials").OnPlayerDisconnect(pid)``` *underneath* ```myMod.OnPlayerDisconnect```
